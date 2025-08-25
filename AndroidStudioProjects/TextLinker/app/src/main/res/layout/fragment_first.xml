@@ -1,0 +1,99 @@
+<?xml version="1.0" encoding="utf-8"?>
+<androidx.coordinatorlayout.widget.CoordinatorLayout
+    xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:background="@android:color/white">
+
+    <androidx.swiperefreshlayout.widget.SwipeRefreshLayout
+        android:id="@+id/swipeRefresh"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent">
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="match_parent"
+            android:orientation="vertical">
+
+            <!-- Logo at the top (bigger and centered) -->
+            <ImageView
+                android:id="@+id/ivLogo"
+                android:layout_width="200dp"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="12dp"
+                android:layout_marginBottom="8dp"
+                android:layout_gravity="center_horizontal"
+                android:adjustViewBounds="true"
+                android:contentDescription="TextLinker Logo"
+                android:src="@drawable/logo" />
+
+            <!-- Search Bar -->
+            <EditText
+                android:id="@+id/etSearch"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_margin="8dp"
+                android:hint="Search your text..."
+                android:padding="12dp"
+                android:textColorHint="#888888"
+                android:background="@drawable/search_bar_background" />
+
+                <!-- Empty State Message -->
+            <TextView
+                android:id="@+id/tvEmpty"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="Any text you save will be displayed here"
+                android:textSize="16sp"
+                android:layout_gravity="center"
+                android:visibility="gone" />
+
+            <!-- RecyclerView for the notes -->
+            <androidx.recyclerview.widget.RecyclerView
+                android:id="@+id/rvItems"
+                android:layout_width="match_parent"
+                android:layout_height="0dp"
+                android:layout_weight="1"
+                android:padding="8dp" />
+        </LinearLayout>
+    </androidx.swiperefreshlayout.widget.SwipeRefreshLayout>
+
+    <!-- FAB for adding new note (bottom right) -->
+    <com.google.android.material.floatingactionbutton.FloatingActionButton
+        android:id="@+id/fabAdd"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_margin="16dp"
+        android:src="@drawable/ic_add"
+        android:contentDescription="Add Note"
+        app:backgroundTint="@color/light_blue"
+        app:layout_anchorGravity="bottom|end"
+        app:layout_anchor="@id/rvItems" />
+
+    <!-- FAB for QR scanner (center bottom) -->
+    <com.google.android.material.floatingactionbutton.FloatingActionButton
+        android:id="@+id/fabQrScanner"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_marginBottom="16dp"
+        android:contentDescription="QR Scanner"
+        android:src="@drawable/ic_qr"
+        app:backgroundTint="@color/light_blue"
+        app:layout_anchorGravity="bottom|center_horizontal"
+        app:layout_anchor="@id/rvItems" />
+        
+    <!-- FAB for Help (bottom left) -->
+    <com.google.android.material.floatingactionbutton.FloatingActionButton
+        android:id="@+id/fabHelp"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_marginBottom="16dp"
+        android:layout_marginStart="24dp"
+        android:contentDescription="Help"
+        android:src="@drawable/ic_help"
+        app:backgroundTint="@color/light_blue"
+        app:layout_anchorGravity="bottom|start"
+        app:layout_anchor="@id/rvItems" />
+
+</androidx.coordinatorlayout.widget.CoordinatorLayout>

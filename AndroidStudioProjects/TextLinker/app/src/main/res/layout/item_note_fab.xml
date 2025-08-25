@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="utf-8"?>
+<com.google.android.material.floatingactionbutton.ExtendedFloatingActionButton
+    xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    android:id="@+id/efabNote"
+    android:layout_width="wrap_content"
+    android:layout_height="wrap_content"
+    android:layout_margin="8dp"
+    android:text="Note Title"
+    android:textColor="@android:color/white"
+    app:backgroundTint="?attr/colorPrimary"
+    app:icon="@drawable/ic_note"
+    app:iconTint="@android:color/white" />

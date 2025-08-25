@@ -1,0 +1,67 @@
+plugins {
+    id 'com.android.application' // Make sure this line exists and is correct
+    // Add other plugins if you have them, e.g., id 'kotlin-android'
+}
+
+android {
+    namespace 'com.example.myapplication2' // Ensure namespace is defined
+    compileSdk 34 // Example SDK version, adjust if needed
+
+    defaultConfig {
+        applicationId "com.example.myapplication2"
+        minSdk 24 // Example min SDK, adjust if needed
+        targetSdk 34 // Example target SDK, adjust if needed
+        versionCode 1
+        versionName "1.0"
+
+        testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
+    }
+
+    buildTypes {
+        release {
+            minifyEnabled false
+            proguardFiles getDefaultProguardFile('proguard-android-optimize.txt'), 'proguard-rules.pro'
+        }
+    }
+    compileOptions {
+        // Change VERSION_1_8 to VERSION_11
+        sourceCompatibility JavaVersion.VERSION_11
+        targetCompatibility JavaVersion.VERSION_11
+    }
+    // Remove this block if your project doesn't use Kotlin
+    /*
+    kotlinOptions { // Add or modify this block if you use Kotlin
+        // Change jvmTarget if it exists and is lower than "11"
+        jvmTarget = '11'
+    }
+    */
+    buildFeatures {
+        viewBinding true // Example, if you use view binding
+    }
+}
+
+dependencies {
+    // Ensure all these lines are DIRECTLY INSIDE this dependencies block
+
+    implementation 'androidx.appcompat:appcompat:1.6.1'
+    implementation 'com.google.android.material:material:1.12.0'
+    implementation 'androidx.activity:activity:1.8.0'
+    implementation 'androidx.constraintlayout:constraintlayout:2.1.4'
+
+    // Gson dependency
+    implementation 'com.google.code.gson:gson:2.9.0'
+
+    // Add Navigation Component dependencies
+    def nav_version = "2.7.7" // Use the latest stable version
+    implementation "androidx.navigation:navigation-fragment:$nav_version"
+    implementation "androidx.navigation:navigation-ui:$nav_version"
+    // For Kotlin use:
+    // implementation "androidx.navigation:navigation-fragment-ktx:$nav_version"
+    // implementation "androidx.navigation:navigation-ui-ktx:$nav_version"
+
+    // Test dependencies
+    testImplementation libs.junit // Or 'junit:junit:4.13.2'
+    androidTestImplementation libs.ext.junit // Or 'androidx.test.ext:junit:1.1.5'
+    androidTestImplementation libs.espresso.core // Or 'androidx.test.espresso:espresso-core:3.5.1'
+
+}

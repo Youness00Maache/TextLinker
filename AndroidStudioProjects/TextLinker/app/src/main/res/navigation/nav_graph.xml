@@ -1,0 +1,105 @@
+<?xml version="1.0" encoding="utf-8"?>
+<navigation
+    xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    xmlns:tools="http://schemas.android.com/tools"
+    android:id="@+id/nav_graph"
+    app:startDestination="@id/firstFragment">
+
+    <!-- First Fragment (Notes List) -->
+    <fragment
+        android:id="@+id/firstFragment"
+        android:name="com.xfire.textlinker.FirstFragment"
+        android:label="Notes">
+        <action
+            android:id="@+id/action_firstFragment_to_secondFragment"
+            app:destination="@id/secondFragment" />
+        <action
+            android:id="@+id/action_firstFragment_to_thirdFragment"
+            app:destination="@id/thirdFragment" />
+        <action
+            android:id="@+id/action_firstFragment_to_scanFragment"
+            app:destination="@id/scanFragment" />
+        <action
+            android:id="@+id/action_firstFragment_to_shareFragment"
+            app:destination="@id/shareFragment" />
+        <action
+            android:id="@+id/action_firstFragment_to_helpFragment"
+            app:destination="@id/helpFragment" />
+    </fragment>
+
+    <!-- Second Fragment (Note Detail) -->
+    <fragment
+        android:id="@+id/secondFragment"
+        android:name="com.xfire.textlinker.SecondFragment"
+        android:label="Note Detail">
+        <argument
+            android:name="title"
+            app:argType="string" />
+        <argument
+            android:name="content"
+            app:argType="string" />
+        <action
+            android:id="@+id/action_secondFragment_to_shareFragment"
+            app:destination="@id/shareFragment" />
+    </fragment>
+
+    <!-- Third Fragment (Note Editor) -->
+    <fragment
+        android:id="@+id/thirdFragment"
+        android:name="com.xfire.textlinker.ThirdFragment"
+        android:label="Edit Note">
+        <argument
+            android:name="title"
+            app:argType="string"
+            android:defaultValue="" />
+        <argument
+            android:name="content"
+            app:argType="string"
+            android:defaultValue="" />
+        <argument
+            android:name="noteId"
+            app:argType="integer"
+            android:defaultValue="0" />
+    </fragment>
+
+    <!-- Scan Fragment -->
+    <fragment
+        android:id="@+id/scanFragment"
+        android:name="com.xfire.textlinker.ScanFragment"
+        android:label="QR Scanner">
+        <action
+            android:id="@+id/action_scanFragment_to_firstFragment"
+            app:destination="@id/firstFragment"
+            app:popUpTo="@id/firstFragment"
+            app:popUpToInclusive="true" />
+    </fragment>
+    
+    <!-- Share Fragment -->
+    <fragment
+        android:id="@+id/shareFragment"
+        android:name="com.xfire.textlinker.ShareFragment"
+        android:label="Share Note"
+        tools:layout="@layout/fragment_share">
+        <argument
+            android:name="noteId"
+            app:argType="integer"
+            android:defaultValue="0" />
+        <argument
+            android:name="noteTitle"
+            app:argType="string"
+            android:defaultValue="" />
+        <argument
+            android:name="noteContent"
+            app:argType="string"
+            android:defaultValue="" />
+    </fragment>
+
+    <!-- Help Fragment -->
+    <fragment
+        android:id="@+id/helpFragment"
+        android:name="com.xfire.textlinker.HelpFragment"
+        android:label="Help"
+        tools:layout="@layout/fragment_help" />
+
+</navigation>

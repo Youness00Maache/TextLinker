@@ -1,0 +1,13 @@
+<resources xmlns:tools="http://schemas.android.com/tools">
+    <!-- Base application theme. -->
+    <style name="Base.Theme.TextLinker" parent="Theme.Material3.DayNight.NoActionBar">
+        <!-- Customize your light theme here. -->
+        <item name="colorPrimary">@color/button_color</item>
+        <item name="colorOnPrimary">@color/white</item>
+        <item name="android:windowBackground">#1B1B1B</item>
+        <item name="android:editTextColor">@color/black</item>
+        <item name="android:textColorHint">@color/search_hint_color</item>
+    </style>
+
+    <style name="Theme.TextLinker" parent="Base.Theme.TextLinker" />
+</resources>
