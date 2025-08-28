@@ -4,31 +4,41 @@ import android.Manifest
 import android.content.pm.PackageManager
 import android.os.Bundle
 import android.util.Log
-import android.util.Size
 import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
 import android.widget.Toast
+import android.widget.TextView
+import android.widget.Button
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.camera.core.CameraSelector
 import androidx.camera.core.ImageAnalysis
+import androidx.camera.core.ImageProxy
 import androidx.camera.core.Preview
 import androidx.camera.lifecycle.ProcessCameraProvider
+import androidx.camera.view.PreviewView
 import androidx.core.content.ContextCompat
 import androidx.fragment.app.Fragment
-import androidx.fragment.app.viewModels
+import androidx.fragment.app.activityViewModels
 import androidx.lifecycle.lifecycleScope
 import com.google.mlkit.vision.barcode.BarcodeScanner
 import com.google.mlkit.vision.barcode.BarcodeScanning
+import com.google.mlkit.vision.barcode.BarcodeScannerOptions
 import com.google.mlkit.vision.common.InputImage
 import java.util.Date
 import java.util.concurrent.Executors
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import com.google.mlkit.vision.barcode.common.Barcode
 import com.xfire.textlinker.network.TextLinkerApiService
 import com.xfire.textlinker.NoteEntity
+import com.google.common.util.concurrent.ListenableFuture
+import kotlin.math.ceil
+import kotlin.math.min
+import kotlinx.coroutines.suspendCancellableCoroutine
+import kotlin.coroutines.resume
 import java.util.concurrent.ExecutorService
 
 class ScanFragment : Fragment() {
@@ -40,9 +50,7 @@ class ScanFragment : Fragment() {
     private var imageAnalyzer: ImageAnalysis? = null
     private lateinit var barcodeScanner: BarcodeScanner
     private lateinit var cameraProvider: ProcessCameraProvider
-    private val apiService: TextLinkerApiService by lazy {
-        TextLinkerApiService.create()
-    }
+    private lateinit var apiService: TextLinkerApiService
     private lateinit var cameraProviderFuture: ListenableFuture<ProcessCameraProvider>
     private val viewModel: NotesViewModel by activityViewModels()
     
@@ -142,7 +150,7 @@ class ScanFragment : Fragment() {
     }
 
     @androidx.camera.core.ExperimentalGetImage
-private fun processImage(imageProxy: ImageProxy) {
+    private fun processImage(imageProxy: ImageProxy) {
         val mediaImage = imageProxy.image
         if (mediaImage != null) {
             val image = InputImage.fromMediaImage(mediaImage, imageProxy.imageInfo.rotationDegrees)
@@ -185,10 +193,10 @@ private fun processImage(imageProxy: ImageProxy) {
                                 tvScanHint.text = "Token scanned: $token\nPreparing to upload notes..."
                             }
 
-                            // Fetch text from server using the token in a coroutine
+                            // Upload all local notes to the server using the token in a coroutine
                             viewLifecycleOwner.lifecycleScope.launch {
                                 try {
-                                    fetchTextFromServer(token)
+                                    uploadAllLocalNotes(token)
                                 } catch (e: Exception) {
                                     Log.e(TAG, "Error in fetchTextFromServer", e)
                                     requireActivity().runOnUiThread {
@@ -219,90 +227,84 @@ private fun processImage(imageProxy: ImageProxy) {
         }
     }
     
-    private suspend fun fetchTextFromServer(token: String) {
+    private suspend fun uploadAllLocalNotes(token: String) {
         try {
-            Log.d("ScanFragment", "Starting to fetch text from server")
-            
-            // Get all local notes
+            Log.d(TAG, "Starting auto-upload of local notes after scan")
+
             val localNotes = viewModel.getLocalNotes()
-            Log.d("ScanFragment", "Retrieved ${localNotes.size} local notes")
-            
-            // Log details of all local notes
+            Log.d(TAG, "Retrieved ${localNotes.size} local notes")
+
             localNotes.forEachIndexed { index, note ->
-                Log.d("ScanFragment", "Local note #$index: id=${note.id}, " +
-                    "title='${note.title.take(20)}...', " +
-                    "fromServer=${note.fromServer}, " +
-                    "contentLength=${note.content.length}")
+                Log.d(TAG, "Local note #$index: id=${note.id}, title='${note.title.take(20)}...', fromServer=${note.fromServer}, contentLength=${note.content.length}")
             }
-            
+
             if (localNotes.isEmpty()) {
-                Log.d("ScanFragment", "No local notes to upload")
                 withContext(Dispatchers.Main) {
                     Toast.makeText(context, "No local notes to upload", Toast.LENGTH_SHORT).show()
                     showLoading(false)
                 }
                 return
             }
-            
-            // Build combined text from local notes with metadata
-            val combinedText = StringBuilder()
-            localNotes.forEachIndexed { index, note ->
-                combinedText.append("--- Note ${index + 1} ---\n")
-                    .append("ID: ${note.id}\n")
-                    .append("Title: ${note.title}\n")
-                    .append("From Server: ${note.fromServer}\n")
-                    .append("Created: ${Date(note.timestamp)}\n")
-                    .append("Content Length: ${note.content.length} characters\n")
-                    .append("\n${note.content}\n\n")
+
+            val combined = buildCombinedText(localNotes)
+            val prefs = requireContext().getSharedPreferences("textlinker_prefs", android.content.Context.MODE_PRIVATE)
+
+            // Flag upload in progress
+            prefs.edit().putBoolean("upload_in_progress_$token", true).apply()
+
+            withContext(Dispatchers.Main) {
+                tvScanHint.text = "Uploading ${localNotes.size} notes (${combined.length} chars)..."
             }
-            
-            val combinedTextStr = combinedText.toString()
-            Log.d("ScanFragment", "Combined text length: ${combinedTextStr.length} characters")
-            Log.d("ScanFragment", "Preview of combined text:\n${combinedTextStr.take(500)}...")
-            
-            // Upload the combined text
-            Log.d("ScanFragment", "Uploading text to server...")
-            val response = try {
-                apiService.uploadText("Bearer $token", combinedTextStr)
-            } catch (e: Exception) {
-                Log.e("ScanFragment", "Network error during upload", e)
-                withContext(Dispatchers.Main) {
-                    Toast.makeText(context, "Network error: ${e.message}", Toast.LENGTH_SHORT).show()
-                    showLoading(false)
+
+            val success = if (combined.length <= chunkSize) {
+                val (ok, code) = uploadTextAwait(token, combined)
+                Log.d(TAG, "upload /upload done code=$code ok=$ok len=${combined.length}")
+                ok
+            } else {
+                val totalChunks = ceil(combined.length.toDouble() / chunkSize.toDouble()).toInt()
+                Log.d(TAG, "upload-chunk totalChunks=$totalChunks chunkSize=$chunkSize totalLen=${combined.length}")
+                var allOk = true
+                var idx = 0
+                while (idx < totalChunks && allOk) {
+                    val start = idx * chunkSize
+                    val end = min(start + chunkSize, combined.length)
+                    val part = combined.substring(start, end)
+                    val (ok, code) = uploadChunkAwait(token, idx, totalChunks, part)
+                    Log.d(TAG, "chunk $idx/$totalChunks code=$code ok=$ok len=${part.length}")
+                    allOk = allOk && ok
+                    idx++
                 }
-                return
+                allOk
             }
-            
-            if (response.isSuccessful) {
-                val responseBody = response.body()
-                val message = responseBody?.message ?: "No message"
-                Log.d("ScanFragment", "Upload successful, message: $message")
-                
-                // Log before updating notes
-                Log.d("ScanFragment", "Marking ${localNotes.size} notes as fromServer=true")
-                
-                // Mark all local notes as from server to prevent re-upload
+
+            // Clear in-progress flag
+            prefs.edit().remove("upload_in_progress_$token").apply()
+
+            if (success) {
+                // Remember last uploaded payload to avoid echo on refresh
+                prefs.edit()
+                    .putString("last_uploaded_payload_${token}", combined)
+                    .putLong("last_upload_success_${token}", System.currentTimeMillis())
+                    .apply()
+
+                // Mark notes so they won't be re-uploaded as local-only next time
                 localNotes.forEach { note ->
-                    Log.d("ScanFragment", "Updating note ${note.id} to fromServer=true")
-                    val updatedNote = note.copy(fromServer = true)
-                    viewModel.update(updatedNote)
+                    val updated = note.copy(fromServer = true)
+                    viewModel.update(updated)
                 }
-                
+
                 withContext(Dispatchers.Main) {
-                    Toast.makeText(context, "Upload successful!", Toast.LENGTH_SHORT).show()
+                    Toast.makeText(context, "Notes uploaded", Toast.LENGTH_SHORT).show()
                     showLoading(false)
                 }
             } else {
-                val errorBody = response.errorBody()?.string() ?: "Unknown error"
-                Log.e("ScanFragment", "Upload failed: ${response.code()} - $errorBody")
                 withContext(Dispatchers.Main) {
-                    Toast.makeText(context, "Upload failed: ${response.code()}", Toast.LENGTH_SHORT).show()
+                    Toast.makeText(context, "Upload failed", Toast.LENGTH_LONG).show()
                     showLoading(false)
                 }
             }
-            
         } catch (e: Exception) {
-            Log.e("ScanFragment", "Error in fetchTextFromServer", e)
+            Log.e(TAG, "Auto-upload error", e)
             withContext(Dispatchers.Main) {
                 Toast.makeText(context, "Error: ${e.message}", Toast.LENGTH_SHORT).show()
                 showLoading(false)
@@ -310,73 +312,48 @@ private fun processImage(imageProxy: ImageProxy) {
         }
     }
 
-    // Upload function with progress tracking and proper error handling
-    private suspend fun uploadAllNotesToServer(token: String, notesText: String, notesCount: Int? = null, idsMasked: String? = null): Boolean {
-        if (token.isBlank()) {
-            Log.e(TAG, "uploadAllNotesToServer: token empty, abort")
-            return false
+    private fun buildCombinedText(notes: List<NoteEntity>): String {
+        val sb = StringBuilder()
+        sb.append(COMBINED_HEADER)
+        notes.forEach { note ->
+            sb.append("Title: ").append(note.title).append('\n')
+            sb.append("Created: ").append(Date(note.timestamp)).append('\n')
+            sb.append(NOTE_DELIM)
+            sb.append(note.content)
+            sb.append("\n\n")
         }
-        
-        val maskedToken = if (token.length > 6) token.take(3) + "***" + token.takeLast(3) else "***"
-        Log.d(TAG, "uploadAllNotesToServer: token=$maskedToken len=${notesText.length} prefix='${notesText.take(30)}'")
-        
-        // Log required OUT line with count and ids (use provided metadata)
-        val countForLog = notesCount ?: -1
-        val idsForLog = idsMasked ?: ""
-        Log.d(TAG, "UPLOAD ATTEMPT token=${token.take(6)} count=$countForLog ids=$idsForLog")
+        return sb.toString()
+    }
 
-        val prefs = requireContext().getSharedPreferences("textlinker_prefs", android.content.Context.MODE_PRIVATE)
-        
-        // Set upload in progress flag
-        prefs.edit().putBoolean("upload_in_progress_$token", true).apply()
-        Log.d(TAG, "Set upload_in_progress_$token = true")
-        
-        // Update UI to show we're uploading
-        withContext(Dispatchers.Main) {
-            tvScanHint.text = "Uploading text (${notesText.length} chars)..."
+    private suspend fun uploadTextAwait(token: String, text: String): Pair<Boolean, Int> = suspendCancellableCoroutine { cont ->
+        apiService.uploadText(token, text) { success, code, _ ->
+            if (cont.isActive) cont.resume(success to code)
         }
-        
-        return try {
-            val response = apiService.uploadText("Bearer $token", notesText)
-            response.isSuccessful
-        } catch (e: Exception) {
-            Log.e(TAG, "Error in uploadAllNotesToServer", e)
-            false
-        } finally {
-            // Clear upload in progress flag
-            prefs.edit().remove("upload_in_progress_$token").apply()
-            Log.d(TAG, "Cleared upload_in_progress_$token")
+    }
+
+    private suspend fun uploadChunkAwait(token: String, idx: Int, total: Int, chunk: String): Pair<Boolean, Int> = suspendCancellableCoroutine { cont ->
+        apiService.uploadChunk(token, idx, total, chunk) { ok, code, _ ->
+            if (cont.isActive) cont.resume(ok to code)
         }
-        // Log the upload attempt
-        Log.d(TAG, "OUT HTTP POST /upload token=${token.take(6)} count=$countForLog bodyPrefix=${notesText.take(200)} ids=$idsForLog")
-        Log.d(TAG, "OUT HTTP POST /upload bodySuffix=${notesText.takeLast(200)}")
-        
-        // Update UI based on upload result
-        withContext(Dispatchers.Main) {
-            if (result) {
-                Log.d(TAG, "Upload success token=${token.take(6)} len=${notesText.length}")
-                tvScanHint.text = "Upload succeeded"
-                Toast.makeText(context, "Notes shared successfully", Toast.LENGTH_SHORT).show()
-            } else {
-                Log.e(TAG, "Upload failed")
-                tvScanHint.text = "Upload failed"
-                Toast.makeText(context, "Failed to share notes", Toast.LENGTH_LONG).show()
-            }
-        }
-        
-        return result
+    }
+
+    // Simple loading indicator hook to keep UI consistent
+    private fun showLoading(isLoading: Boolean) {
+        try {
+            btnScanQR.isEnabled = !isLoading
+        } catch (_: Exception) {}
     }
 
     // scheduleRetryUpload() should be called only if initial upload returned false
     private fun scheduleRetryUpload(token: String, notesText: String) {
         viewLifecycleOwner.lifecycleScope.launch {
-            delay(3000) // 3 second delay before retry
+            delay(3000)
             try {
-                val success = uploadAllNotesToServer(token, notesText)
-                if (success) {
-                    Log.d(TAG, "Delayed retry succeeded; prefs handled in upload path")
+                val (ok, _) = uploadTextAwait(token, notesText)
+                if (ok) {
+                    Log.d(TAG, "Delayed retry succeeded")
                 } else {
-                    Log.e(TAG, "Delayed retry failed; will not overwrite prefs")
+                    Log.e(TAG, "Delayed retry failed")
                 }
             } catch (e: Exception) {
                 Log.e(TAG, "Error during retry upload", e)
