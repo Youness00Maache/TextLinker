@@ -17,6 +17,11 @@ import java.util.Locale
  * Service class for handling network communication with the TextLinker server.
  */
 class TextLinkerApiService(private val serverUrl: String) {
+    companion object {
+        fun create(serverUrl: String = "https://textlinker.pro"): TextLinkerApiService {
+            return TextLinkerApiService(serverUrl)
+        }
+    }
     
     private val client: OkHttpClient = OkHttpClient.Builder()
         .addInterceptor(NetworkLoggingInterceptor())
