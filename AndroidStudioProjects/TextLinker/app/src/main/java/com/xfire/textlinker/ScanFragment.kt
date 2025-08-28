@@ -80,9 +80,9 @@ class ScanFragment : Fragment() {
 
     override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
         super.onViewCreated(view, savedInstanceState)
-        viewFinder = view.findViewById(R.id.viewFinder)
-        tvScanHint = view.findViewById(R.id.tvScanHint)
-        btnScanQR = view.findViewById(R.id.btnScanQR)
+        viewFinder = view.findViewById<PreviewView>(R.id.viewFinder)
+        tvScanHint = view.findViewById<TextView>(R.id.tvScanHint)
+        btnScanQR = view.findViewById<Button>(R.id.btnScanQR)
         
         // Initialize API service
         apiService = TextLinkerApiService(serverUrl)
